@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Flight } from '@/types/flight';
 import { FlightCard } from './FlightCard';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, MapPin, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { translateCity, translateCountry } from '@/utils/translations';
 
 interface GroupedViewProps {
   flights: Flight[];
@@ -19,7 +19,7 @@ export const GroupedView = ({ flights, groupBy }: GroupedViewProps) => {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groupedData = useMemo(() => {
-    const grouped: { [key: string]: { flights: Flight[]; minPrice: number; country?: string } } = {};
+    const grouped: { [key: string]: { flights: Flight[]; minPrice: number; country?: string; originalName: string } } = {};
 
     flights.forEach((flight) => {
       const key = groupBy === 'country' ? flight.orszag : flight.varos;
@@ -27,7 +27,8 @@ export const GroupedView = ({ flights, groupBy }: GroupedViewProps) => {
         grouped[key] = { 
           flights: [], 
           minPrice: Infinity,
-          country: groupBy === 'city' ? flight.orszag : undefined
+          country: groupBy === 'city' ? flight.orszag : undefined,
+          originalName: key,
         };
       }
       grouped[key].flights.push(flight);
@@ -37,10 +38,11 @@ export const GroupedView = ({ flights, groupBy }: GroupedViewProps) => {
     return Object.entries(grouped)
       .map(([name, data]) => ({
         name,
+        displayName: groupBy === 'country' ? translateCountry(name) : translateCity(name),
         flights: data.flights.sort((a, b) => a.ar - b.ar),
         minPrice: data.minPrice,
         count: data.flights.length,
-        country: data.country,
+        country: data.country ? translateCountry(data.country) : undefined,
       }))
       .sort((a, b) => a.minPrice - b.minPrice);
   }, [flights, groupBy]);
@@ -78,7 +80,7 @@ export const GroupedView = ({ flights, groupBy }: GroupedViewProps) => {
                 )}
               </div>
               <div className="text-left">
-                <h3 className="font-display font-semibold text-lg">{group.name}</h3>
+                <h3 className="font-display font-semibold text-lg">{group.displayName}</h3>
                 {group.country && (
                   <p className="text-sm text-muted-foreground">{group.country}</p>
                 )}

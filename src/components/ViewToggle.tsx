@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
-import { LayoutGrid, List, Globe, MapPin } from 'lucide-react';
+import { LayoutGrid, List, Globe, MapPin, Map } from 'lucide-react';
 
 interface ViewToggleProps {
-  view: 'list' | 'country' | 'city';
-  setView: (view: 'list' | 'country' | 'city') => void;
+  view: 'list' | 'country' | 'city' | 'map';
+  setView: (view: 'list' | 'country' | 'city' | 'map') => void;
   totalFlights: number;
   filteredFlights: number;
 }
@@ -23,15 +23,24 @@ export const ViewToggle = ({ view, setView, totalFlights, filteredFlights }: Vie
         </span>
       </div>
       
-      <div className="flex items-center gap-2 p-1 bg-secondary/50 rounded-xl">
+      <div className="flex items-center gap-1 p-1 bg-secondary/50 rounded-xl flex-wrap">
         <Button
           variant={view === 'list' ? 'default' : 'ghost'}
           size="sm"
           onClick={() => setView('list')}
           className="rounded-lg"
         >
-          <LayoutGrid className="w-4 h-4 mr-2" />
-          Lista
+          <LayoutGrid className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Lista</span>
+        </Button>
+        <Button
+          variant={view === 'map' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setView('map')}
+          className="rounded-lg"
+        >
+          <Map className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Térkép</span>
         </Button>
         <Button
           variant={view === 'country' ? 'default' : 'ghost'}
@@ -39,8 +48,8 @@ export const ViewToggle = ({ view, setView, totalFlights, filteredFlights }: Vie
           onClick={() => setView('country')}
           className="rounded-lg"
         >
-          <Globe className="w-4 h-4 mr-2" />
-          Országok
+          <Globe className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Országok</span>
         </Button>
         <Button
           variant={view === 'city' ? 'default' : 'ghost'}
@@ -48,8 +57,8 @@ export const ViewToggle = ({ view, setView, totalFlights, filteredFlights }: Vie
           onClick={() => setView('city')}
           className="rounded-lg"
         >
-          <MapPin className="w-4 h-4 mr-2" />
-          Városok
+          <MapPin className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Városok</span>
         </Button>
       </div>
     </div>

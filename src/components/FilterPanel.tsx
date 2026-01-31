@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Search, X, Filter, Plane } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { translateCountry, translateCity } from '@/utils/translations';
 
 interface FilterPanelProps {
   filters: FlightFilters;
@@ -96,6 +97,15 @@ export const FilterPanel = ({
     filters.minDays > stats.daysRange.min ||
     filters.maxDays < stats.daysRange.max;
 
+  // Sort countries and cities by Hungarian name
+  const sortedCountries = [...stats.countries].sort((a, b) => 
+    translateCountry(a).localeCompare(translateCountry(b), 'hu')
+  );
+  
+  const sortedCities = [...stats.cities].sort((a, b) => 
+    translateCity(a).localeCompare(translateCity(b), 'hu')
+  );
+
   return (
     <div className="glass-card p-4 md:p-6 mb-6">
       {/* Search bar - always visible */}
@@ -149,13 +159,15 @@ export const FilterPanel = ({
                   onValueChange={(v) => updateFilter('country', v === 'all' ? '' : v)}
                 >
                   <SelectTrigger className="h-11 bg-secondary/50 border-0 rounded-xl">
-                    <SelectValue placeholder="Összes ország" />
+                    <SelectValue placeholder="Összes ország">
+                      {filters.country ? translateCountry(filters.country) : 'Összes ország'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Összes ország</SelectItem>
-                    {stats.countries.map((country) => (
+                    {sortedCountries.map((country) => (
                       <SelectItem key={country} value={country}>
-                        {country}
+                        {translateCountry(country)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -170,13 +182,15 @@ export const FilterPanel = ({
                   onValueChange={(v) => updateFilter('city', v === 'all' ? '' : v)}
                 >
                   <SelectTrigger className="h-11 bg-secondary/50 border-0 rounded-xl">
-                    <SelectValue placeholder="Összes város" />
+                    <SelectValue placeholder="Összes város">
+                      {filters.city ? translateCity(filters.city) : 'Összes város'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Összes város</SelectItem>
-                    {stats.cities.map((city) => (
+                    {sortedCities.map((city) => (
                       <SelectItem key={city} value={city}>
-                        {city}
+                        {translateCity(city)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -267,44 +281,56 @@ export const FilterPanel = ({
                 </Select>
               </div>
 
-              {/* Price Range */}
-              <div className="space-y-3 md:col-span-2">
+              {/* Price Range - Dual thumb slider */}
+              <div className="space-y-4 md:col-span-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Ár</Label>
-                  <span className="text-sm text-muted-foreground">
-                    {formatPrice(filters.minPrice)} - {formatPrice(filters.maxPrice)} Ft
+                  <Label className="text-sm font-medium">Ár tartomány</Label>
+                  <span className="text-sm font-medium text-primary">
+                    {formatPrice(filters.minPrice)} Ft - {formatPrice(filters.maxPrice)} Ft
                   </span>
                 </div>
-                <Slider
-                  value={[filters.minPrice, filters.maxPrice]}
-                  min={stats.priceRange.min}
-                  max={stats.priceRange.max}
-                  step={1000}
-                  onValueChange={([min, max]) => {
-                    setFilters({ ...filters, minPrice: min, maxPrice: max });
-                  }}
-                  className="py-2"
-                />
+                <div className="px-1">
+                  <Slider
+                    value={[filters.minPrice, filters.maxPrice]}
+                    min={stats.priceRange.min}
+                    max={stats.priceRange.max}
+                    step={1000}
+                    onValueChange={([min, max]) => {
+                      setFilters({ ...filters, minPrice: min, maxPrice: max });
+                    }}
+                    className="py-4"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{formatPrice(stats.priceRange.min)} Ft</span>
+                  <span>{formatPrice(stats.priceRange.max)} Ft</span>
+                </div>
               </div>
 
-              {/* Days Range */}
-              <div className="space-y-3">
+              {/* Days Range - Dual thumb slider */}
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">Utazás hossza</Label>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm font-medium text-primary">
                     {filters.minDays} - {filters.maxDays} nap
                   </span>
                 </div>
-                <Slider
-                  value={[filters.minDays, filters.maxDays]}
-                  min={stats.daysRange.min}
-                  max={stats.daysRange.max}
-                  step={1}
-                  onValueChange={([min, max]) => {
-                    setFilters({ ...filters, minDays: min, maxDays: max });
-                  }}
-                  className="py-2"
-                />
+                <div className="px-1">
+                  <Slider
+                    value={[filters.minDays, filters.maxDays]}
+                    min={stats.daysRange.min}
+                    max={stats.daysRange.max}
+                    step={1}
+                    onValueChange={([min, max]) => {
+                      setFilters({ ...filters, minDays: min, maxDays: max });
+                    }}
+                    className="py-4"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{stats.daysRange.min} nap</span>
+                  <span>{stats.daysRange.max} nap</span>
+                </div>
               </div>
 
               {/* Direct only */}

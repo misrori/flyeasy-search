@@ -1,8 +1,9 @@
 import { Flight } from '@/types/flight';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plane, Calendar, Clock, ArrowRight, ExternalLink, MapPin } from 'lucide-react';
+import { Plane, Calendar, Clock, ExternalLink, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { translateCity, translateCountry } from '@/utils/translations';
 
 interface FlightCardProps {
   flight: Flight;
@@ -52,10 +53,12 @@ export const FlightCard = ({ flight, index }: FlightCardProps) => {
             <Plane className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="font-display font-semibold text-lg text-foreground">{flight.varos}</h3>
+            <h3 className="font-display font-semibold text-lg text-foreground">
+              {translateCity(flight.varos)}
+            </h3>
             <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
               <MapPin className="w-3.5 h-3.5" />
-              <span>{flight.orszag}</span>
+              <span>{translateCountry(flight.orszag)}</span>
               <span className="text-border">•</span>
               <span>{flight.repter_id}</span>
             </div>
