@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Flight, FlightFilters } from '@/types/flight';
+import { translateCity, translateCountry } from '@/utils/translations';
 
 const CSV_URL = 'https://raw.githubusercontent.com/misrori/flights2/main/csv_data/last_prices.csv';
 
@@ -73,11 +74,18 @@ export const useFlights = () => {
 export const useFilteredFlights = (flights: Flight[], filters: FlightFilters) => {
   return useMemo(() => {
     return flights.filter(flight => {
-      // Search query
+      // Search query - search in both original and translated names
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
-        if (!flight.varos.toLowerCase().includes(query) && 
-            !flight.orszag.toLowerCase().includes(query)) {
+        const cityOriginal = flight.varos.toLowerCase();
+        const cityTranslated = translateCity(flight.varos).toLowerCase();
+        const countryOriginal = flight.orszag.toLowerCase();
+        const countryTranslated = translateCountry(flight.orszag).toLowerCase();
+        
+        if (!cityOriginal.includes(query) && 
+            !cityTranslated.includes(query) &&
+            !countryOriginal.includes(query) &&
+            !countryTranslated.includes(query)) {
           return false;
         }
       }

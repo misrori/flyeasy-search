@@ -4,10 +4,11 @@ import { FilterPanel } from '@/components/FilterPanel';
 import { FlightCard } from '@/components/FlightCard';
 import { ViewToggle } from '@/components/ViewToggle';
 import { GroupedView } from '@/components/GroupedView';
+import { MapView } from '@/components/MapView';
 import { SortOptions, SortOption } from '@/components/SortOptions';
 import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingState';
 import { useFlights, useFilteredFlights, useFlightStats } from '@/hooks/useFlights';
-import { FlightFilters, Flight } from '@/types/flight';
+import { FlightFilters } from '@/types/flight';
 
 const Index = () => {
   const { flights, loading, error } = useFlights();
@@ -29,7 +30,7 @@ const Index = () => {
   });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'country' | 'city'>('list');
+  const [view, setView] = useState<'list' | 'country' | 'city' | 'map'>('list');
   const [sortBy, setSortBy] = useState<SortOption>('price-asc');
   const [visibleCount, setVisibleCount] = useState(20);
 
@@ -121,6 +122,8 @@ const Index = () => {
 
         {filteredFlights.length === 0 ? (
           <EmptyState />
+        ) : view === 'map' ? (
+          <MapView flights={filteredFlights} />
         ) : view === 'list' ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
