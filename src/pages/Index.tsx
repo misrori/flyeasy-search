@@ -4,14 +4,16 @@ import { FilterPanel } from '@/components/FilterPanel';
 import { FlightCard } from '@/components/FlightCard';
 import { ViewToggle } from '@/components/ViewToggle';
 import { GroupedView } from '@/components/GroupedView';
-import { MapView } from '@/components/MapView';
+import { LeafletMap } from '@/components/LeafletMap';
 import { SortOptions, SortOption } from '@/components/SortOptions';
 import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingState';
 import { useFlights, useFilteredFlights, useFlightStats } from '@/hooks/useFlights';
+import { useAirports } from '@/hooks/useAirports';
 import { FlightFilters } from '@/types/flight';
 
 const Index = () => {
   const { flights, loading, error } = useFlights();
+  const { airportMap, loading: airportsLoading } = useAirports();
   const stats = useFlightStats(flights);
   
   const [filters, setFilters] = useState<FlightFilters>({
@@ -30,7 +32,7 @@ const Index = () => {
   });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'country' | 'city' | 'map'>('list');
+  const [view, setView] = useState<'list' | 'country' | 'city' | 'map'>('map');
   const [sortBy, setSortBy] = useState<SortOption>('price-asc');
   const [visibleCount, setVisibleCount] = useState(20);
 
@@ -77,7 +79,20 @@ const Index = () => {
     setVisibleCount(prev => prev + 20);
   };
 
-  if (loading) {
+  // Handlers for map filter selection
+  const handleSelectCity = (city: string) => {
+    setFilters(prev => ({ ...prev, city, country: '' }));
+    setView('list');
+    setFiltersOpen(true);
+  };
+
+  const handleSelectCountry = (country: string) => {
+    setFilters(prev => ({ ...prev, country, city: '' }));
+    setView('list');
+    setFiltersOpen(true);
+  };
+
+  if (loading || airportsLoading) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -123,7 +138,12 @@ const Index = () => {
         {filteredFlights.length === 0 ? (
           <EmptyState />
         ) : view === 'map' ? (
-          <MapView flights={filteredFlights} />
+          <LeafletMap 
+            flights={filteredFlights} 
+            airportMap={airportMap}
+            onSelectCity={handleSelectCity}
+            onSelectCountry={handleSelectCountry}
+          />
         ) : view === 'list' ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
