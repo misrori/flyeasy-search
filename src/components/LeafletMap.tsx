@@ -18,11 +18,14 @@ import {
 // Budapest coordinates
 const BUDAPEST_COORDS: L.LatLngExpression = [47.4369, 19.2556];
 
+export type Region = 'Europe' | 'Asia';
+
 interface LeafletMapProps {
   flights: Flight[];
   airportMap: { [key: string]: Airport };
   onSelectCity?: (city: string) => void;
   onSelectCountry?: (country: string) => void;
+  region: Region;
 }
 
 const formatPrice = (price: number) => {
@@ -43,7 +46,7 @@ interface DestinationData {
   airport: Airport;
 }
 
-export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry }: LeafletMapProps) => {
+export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry, region }: LeafletMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +55,6 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
   
   const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeContinent, setActiveContinent] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('price-asc');
 
   // Group flights by destination airport and get min price
@@ -83,16 +85,8 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
     return Object.values(destMap).sort((a, b) => a.minPrice - b.minPrice);
   }, [flights, airportMap]);
 
-  // Filter destinations by continent
-  const filteredDestinations = useMemo(() => {
-    if (activeContinent === 'all') return destinations;
-    return destinations.filter(d => d.continent === activeContinent);
-  }, [destinations, activeContinent]);
-
-  // Get unique continents from destinations
-  const continents = useMemo(() => {
-    return [...new Set(destinations.map(d => d.continent))].filter(Boolean).sort();
-  }, [destinations]);
+  // Since region is passed from parent, just use all destinations (already filtered by region in Index.tsx)
+  const filteredDestinations = destinations;
 
   const selectedDestinationData = useMemo(() => {
     if (!selectedDestination) return null;
@@ -228,30 +222,26 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
     });
   }, [filteredDestinations, selectedDestination, destinations]);
 
-  // Update map view when continent changes
+  // Update map view when region changes
   useEffect(() => {
     if (!mapRef.current) return;
     
     let center: L.LatLngExpression = [45, 20];
     let zoom = 4;
 
-    switch (activeContinent) {
+    switch (region) {
       case 'Europe':
         center = [50, 10];
         zoom = 4;
         break;
       case 'Asia':
-        center = [25, 80];
-        zoom = 3;
-        break;
-      case 'Africa':
-        center = [5, 20];
+        center = [15, 100];
         zoom = 3;
         break;
     }
 
     mapRef.current.setView(center, zoom);
-  }, [activeContinent]);
+  }, [region]);
 
   const handleApplyFilters = () => {
     if (selectedDestinationData) {
@@ -306,31 +296,11 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
       className={`glass-card overflow-hidden relative ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`} 
       style={{ height: isFullscreen ? '100vh' : '600px' }}
     >
-      {/* Controls */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-wrap gap-2">
-        <button
-          onClick={() => setActiveContinent('all')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            activeContinent === 'all' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'glass-card hover:bg-secondary'
-          }`}
-        >
-          Összes
-        </button>
-        {continents.map(continent => (
-          <button
-            key={continent}
-            onClick={() => setActiveContinent(continent)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeContinent === continent 
-                ? 'bg-primary text-primary-foreground' 
-                : 'glass-card hover:bg-secondary'
-            }`}
-          >
-            {translateContinent(continent)}
-          </button>
-        ))}
+      {/* Region indicator */}
+      <div className="absolute top-4 left-4 z-[1000] glass-card px-4 py-2">
+        <span className="text-sm font-medium">
+          {region === 'Europe' ? '🇪🇺 Európa' : '🌏 Ázsia'}
+        </span>
       </div>
 
       {/* Fullscreen button */}
