@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Flight } from '@/types/flight';
@@ -8,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plane, ExternalLink, Maximize2, Minimize2, Filter, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -18,7 +16,7 @@ import {
 } from '@/components/ui/select';
 
 // Budapest coordinates
-const BUDAPEST_COORDS: [number, number] = [47.4369, 19.2556];
+const BUDAPEST_COORDS: L.LatLngExpression = [47.4369, 19.2556];
 
 interface LeafletMapProps {
   flights: Flight[];
@@ -31,84 +29,35 @@ const formatPrice = (price: number) => {
   return new Intl.NumberFormat('hu-HU').format(price);
 };
 
-// Custom marker icons based on price
-const createPriceMarker = (color: string, size: number = 12) => {
-  return L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="
-      width: ${size}px;
-      height: ${size}px;
-      background-color: ${color};
-      border: 2px solid white;
-      border-radius: 50%;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    "></div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-};
-
-const budapestIcon = L.divIcon({
-  className: 'budapest-marker',
-  html: `<div style="
-    width: 16px;
-    height: 16px;
-    background-color: hsl(220, 90%, 56%);
-    border: 3px solid white;
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  "></div>`,
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-});
-
-// Component to handle map view changes
-const MapController = ({ center, zoom }: { center: [number, number]; zoom: number }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
-  
-  return null;
-};
-
 type SortOption = 'price-asc' | 'price-desc' | 'date-asc' | 'date-desc';
 
+interface DestinationData {
+  code: string;
+  city: string;
+  country: string;
+  continent: string;
+  region: string;
+  minPrice: number;
+  flights: Flight[];
+  coords: [number, number];
+  airport: Airport;
+}
+
 export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry }: LeafletMapProps) => {
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<L.LayerGroup | null>(null);
+  const linesRef = useRef<L.LayerGroup | null>(null);
+  
   const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeContinent, setActiveContinent] = useState<string>('Europe');
+  const [activeContinent, setActiveContinent] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('price-asc');
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Get map center and zoom based on continent
-  const mapSettings = useMemo(() => {
-    switch (activeContinent) {
-      case 'Europe':
-        return { center: [50, 10] as [number, number], zoom: 4 };
-      case 'Asia':
-        return { center: [25, 80] as [number, number], zoom: 3 };
-      case 'Africa':
-        return { center: [5, 20] as [number, number], zoom: 3 };
-      default:
-        return { center: [30, 30] as [number, number], zoom: 2 };
-    }
-  }, [activeContinent]);
 
   // Group flights by destination airport and get min price
   const destinations = useMemo(() => {
-    const destMap: { [key: string]: { 
-      code: string; 
-      city: string; 
-      country: string;
-      continent: string;
-      region: string;
-      minPrice: number; 
-      flights: Flight[];
-      coords: [number, number];
-      airport: Airport;
-    } } = {};
+    const destMap: { [key: string]: DestinationData } = {};
 
     flights.forEach(flight => {
       const airport = airportMap[flight.repter_id];
@@ -175,9 +124,9 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
     const maxPrice = Math.max(...destinations.map(d => d.minPrice));
     const ratio = (price - minPrice) / (maxPrice - minPrice);
     
-    if (ratio < 0.33) return 'hsl(145, 65%, 45%)'; // Green - cheap
-    if (ratio < 0.66) return 'hsl(45, 90%, 50%)'; // Yellow - medium
-    return 'hsl(15, 90%, 55%)'; // Orange - expensive
+    if (ratio < 0.33) return '#22c55e'; // Green - cheap
+    if (ratio < 0.66) return '#eab308'; // Yellow - medium
+    return '#f97316'; // Orange - expensive
   };
 
   const getMarkerSize = (flightCount: number) => {
@@ -186,10 +135,127 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
     return 10;
   };
 
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current).setView([45, 20], 4);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Add Budapest marker
+    const budapestIcon = L.divIcon({
+      className: 'budapest-marker',
+      html: `<div style="
+        width: 16px;
+        height: 16px;
+        background-color: #3b82f6;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      "></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+
+    L.marker(BUDAPEST_COORDS, { icon: budapestIcon })
+      .addTo(map)
+      .bindPopup('<div class="text-center font-semibold">Budapest</div>');
+
+    // Create layer groups for markers and lines
+    markersRef.current = L.layerGroup().addTo(map);
+    linesRef.current = L.layerGroup().addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Update markers and lines when destinations change
+  useEffect(() => {
+    if (!mapRef.current || !markersRef.current || !linesRef.current) return;
+
+    // Clear existing markers and lines
+    markersRef.current.clearLayers();
+    linesRef.current.clearLayers();
+
+    // Add lines and markers for filtered destinations
+    filteredDestinations.forEach(dest => {
+      // Add line
+      const line = L.polyline([BUDAPEST_COORDS, dest.coords], {
+        color: selectedDestination === dest.code ? '#3b82f6' : 'rgba(59, 130, 246, 0.3)',
+        weight: selectedDestination === dest.code ? 3 : 1,
+        dashArray: selectedDestination === dest.code ? undefined : '5, 10',
+      });
+      linesRef.current!.addLayer(line);
+
+      // Create marker icon
+      const size = getMarkerSize(dest.flights.length);
+      const color = getPriceColor(dest.minPrice);
+      const markerIcon = L.divIcon({
+        className: 'price-marker',
+        html: `<div style="
+          width: ${size}px;
+          height: ${size}px;
+          background-color: ${color};
+          border: 2px solid white;
+          border-radius: 50%;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          cursor: pointer;
+        "></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+      });
+
+      // Add marker
+      const marker = L.marker(dest.coords, { icon: markerIcon });
+      marker.bindPopup(`
+        <div class="text-center">
+          <p class="font-semibold">${translateAirportCity(dest.city)}</p>
+          <p class="text-sm text-gray-500">${translateAirportCountry(dest.country)}</p>
+          <p class="text-blue-600 font-bold">${formatPrice(dest.minPrice)} Ft</p>
+        </div>
+      `);
+      marker.on('click', () => {
+        setSelectedDestination(dest.code);
+      });
+      markersRef.current!.addLayer(marker);
+    });
+  }, [filteredDestinations, selectedDestination, destinations]);
+
+  // Update map view when continent changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    let center: L.LatLngExpression = [45, 20];
+    let zoom = 4;
+
+    switch (activeContinent) {
+      case 'Europe':
+        center = [50, 10];
+        zoom = 4;
+        break;
+      case 'Asia':
+        center = [25, 80];
+        zoom = 3;
+        break;
+      case 'Africa':
+        center = [5, 20];
+        zoom = 3;
+        break;
+    }
+
+    mapRef.current.setView(center, zoom);
+  }, [activeContinent]);
+
   const handleApplyFilters = () => {
     if (selectedDestinationData) {
       if (onSelectCity) {
-        // We pass the original city name from the flight data
         const firstFlight = selectedDestinationData.flights[0];
         if (firstFlight) {
           onSelectCity(firstFlight.varos);
@@ -225,6 +291,10 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
+      // Invalidate map size after fullscreen change
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 100);
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -237,17 +307,30 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
       style={{ height: isFullscreen ? '100vh' : '600px' }}
     >
       {/* Controls */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
-        <Tabs value={activeContinent} onValueChange={setActiveContinent}>
-          <TabsList className="glass-card">
-            <TabsTrigger value="all">Összes</TabsTrigger>
-            {continents.map(continent => (
-              <TabsTrigger key={continent} value={continent}>
-                {translateContinent(continent)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+      <div className="absolute top-4 left-4 z-[1000] flex flex-wrap gap-2">
+        <button
+          onClick={() => setActiveContinent('all')}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeContinent === 'all' 
+              ? 'bg-primary text-primary-foreground' 
+              : 'glass-card hover:bg-secondary'
+          }`}
+        >
+          Összes
+        </button>
+        {continents.map(continent => (
+          <button
+            key={continent}
+            onClick={() => setActiveContinent(continent)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              activeContinent === continent 
+                ? 'bg-primary text-primary-foreground' 
+                : 'glass-card hover:bg-secondary'
+            }`}
+          >
+            {translateContinent(continent)}
+          </button>
+        ))}
       </div>
 
       {/* Fullscreen button */}
@@ -260,75 +343,23 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
         {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
       </Button>
 
-      <MapContainer
-        center={mapSettings.center}
-        zoom={mapSettings.zoom}
-        style={{ width: '100%', height: '100%' }}
-        className="z-0"
-      >
-        <MapController center={mapSettings.center} zoom={mapSettings.zoom} />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {/* Flight lines */}
-        {filteredDestinations.map((dest) => (
-          <Polyline
-            key={`line-${dest.code}`}
-            positions={[BUDAPEST_COORDS, dest.coords]}
-            pathOptions={{
-              color: selectedDestination === dest.code 
-                ? 'hsl(220, 90%, 56%)' 
-                : 'rgba(59, 130, 246, 0.3)',
-              weight: selectedDestination === dest.code ? 3 : 1,
-              dashArray: selectedDestination === dest.code ? undefined : '5, 10',
-            }}
-          />
-        ))}
-
-        {/* Budapest marker */}
-        <Marker position={BUDAPEST_COORDS} icon={budapestIcon}>
-          <Popup>
-            <div className="text-center font-semibold">Budapest</div>
-          </Popup>
-        </Marker>
-
-        {/* Destination markers */}
-        {filteredDestinations.map((dest) => (
-          <Marker
-            key={dest.code}
-            position={dest.coords}
-            icon={createPriceMarker(getPriceColor(dest.minPrice), getMarkerSize(dest.flights.length))}
-            eventHandlers={{
-              click: () => setSelectedDestination(dest.code),
-            }}
-          >
-            <Popup>
-              <div className="text-center">
-                <p className="font-semibold">{translateAirportCity(dest.city)}</p>
-                <p className="text-sm text-muted-foreground">{translateAirportCountry(dest.country)}</p>
-                <p className="text-primary font-bold">{formatPrice(dest.minPrice)} Ft</p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      {/* Map container */}
+      <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 glass-card p-3 text-xs z-[1000]">
         <p className="font-medium mb-2">Ár alapján</p>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(145, 65%, 45%)' }} />
+            <div className="w-3 h-3 rounded-full bg-green-500" />
             <span>Olcsó</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(45, 90%, 50%)' }} />
+            <div className="w-3 h-3 rounded-full bg-yellow-500" />
             <span>Közepes</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(15, 90%, 55%)' }} />
+            <div className="w-3 h-3 rounded-full bg-orange-500" />
             <span>Drága</span>
           </div>
         </div>
@@ -385,7 +416,7 @@ export const LeafletMap = ({ flights, airportMap, onSelectCity, onSelectCountry 
                 onClick={handleApplyFilters}
               >
                 <Filter className="w-3 h-3 mr-1" />
-                Szűrés erre a városra
+                Szűrés városra
               </Button>
               <Button 
                 variant="outline" 
