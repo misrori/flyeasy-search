@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { FilterPanel } from '@/components/FilterPanel';
 import { FlightCard } from '@/components/FlightCard';
-import { ViewToggle } from '@/components/ViewToggle';
+import { ViewToggle, Region } from '@/components/ViewToggle';
 import { GroupedView } from '@/components/GroupedView';
 import { LeafletMap } from '@/components/LeafletMap';
 import { SortOptions, SortOption } from '@/components/SortOptions';
@@ -14,7 +14,21 @@ import { FlightFilters } from '@/types/flight';
 const Index = () => {
   const { flights, loading, error } = useFlights();
   const { airportMap, loading: airportsLoading } = useAirports();
-  const stats = useFlightStats(flights);
+  
+  // Region is the top-level filter - affects everything
+  const [region, setRegion] = useState<Region>('Europe');
+  
+  // Filter flights by region first (using airport data)
+  const regionFilteredFlights = useMemo(() => {
+    return flights.filter(flight => {
+      const airport = airportMap[flight.repter_id];
+      if (!airport) return false;
+      return airport.continent === region;
+    });
+  }, [flights, airportMap, region]);
+
+  // Calculate stats based on region-filtered flights
+  const stats = useFlightStats(regionFilteredFlights);
   
   const [filters, setFilters] = useState<FlightFilters>({
     searchQuery: '',
@@ -36,9 +50,9 @@ const Index = () => {
   const [sortBy, setSortBy] = useState<SortOption>('price-asc');
   const [visibleCount, setVisibleCount] = useState(20);
 
-  // Update filters when stats are loaded
+  // Update filters when stats are loaded or region changes
   useMemo(() => {
-    if (stats.priceRange.max > 0 && filters.maxPrice === Infinity) {
+    if (stats.priceRange.max > 0) {
       setFilters(prev => ({
         ...prev,
         minPrice: stats.priceRange.min,
@@ -47,9 +61,10 @@ const Index = () => {
         maxDays: stats.daysRange.max,
       }));
     }
-  }, [stats]);
+  }, [stats, region]);
 
-  const filteredFlights = useFilteredFlights(flights, filters);
+  // Apply additional filters on top of region-filtered flights
+  const filteredFlights = useFilteredFlights(regionFilteredFlights, filters);
 
   const sortedFlights = useMemo(() => {
     const sorted = [...filteredFlights];
@@ -92,6 +107,14 @@ const Index = () => {
     setFiltersOpen(true);
   };
 
+  // Reset visible count when region changes
+  const handleRegionChange = (newRegion: Region) => {
+    setRegion(newRegion);
+    setVisibleCount(20);
+    // Clear city/country filters when region changes
+    setFilters(prev => ({ ...prev, city: '', country: '' }));
+  };
+
   if (loading || airportsLoading) {
     return (
       <div className="min-h-screen">
@@ -127,8 +150,10 @@ const Index = () => {
           <ViewToggle
             view={view}
             setView={setView}
-            totalFlights={flights.length}
+            totalFlights={regionFilteredFlights.length}
             filteredFlights={filteredFlights.length}
+            region={region}
+            setRegion={handleRegionChange}
           />
           {view === 'list' && (
             <SortOptions value={sortBy} onChange={setSortBy} />
@@ -143,6 +168,7 @@ const Index = () => {
             airportMap={airportMap}
             onSelectCity={handleSelectCity}
             onSelectCountry={handleSelectCountry}
+            region={region}
           />
         ) : view === 'list' ? (
           <>
