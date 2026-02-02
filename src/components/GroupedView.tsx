@@ -5,47 +5,83 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, MapPin, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translateCity, translateCountry } from '@/utils/translations';
+import { SortOption } from './SortOptions';
 
 interface GroupedViewProps {
   flights: Flight[];
   groupBy: 'country' | 'city';
+  sortBy: SortOption;
 }
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('hu-HU').format(price);
 };
 
-export const GroupedView = ({ flights, groupBy }: GroupedViewProps) => {
+export const GroupedView = ({ flights, groupBy, sortBy }: GroupedViewProps) => {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groupedData = useMemo(() => {
-    const grouped: { [key: string]: { flights: Flight[]; minPrice: number; country?: string; originalName: string } } = {};
+    const grouped: {
+      [key: string]: {
+        flights: Flight[];
+        country?: string;
+        originalName: string
+      }
+    } = {};
 
     flights.forEach((flight) => {
       const key = groupBy === 'country' ? flight.orszag : flight.varos;
       if (!grouped[key]) {
-        grouped[key] = { 
-          flights: [], 
-          minPrice: Infinity,
+        grouped[key] = {
+          flights: [],
           country: groupBy === 'city' ? flight.orszag : undefined,
           originalName: key,
         };
       }
       grouped[key].flights.push(flight);
-      grouped[key].minPrice = Math.min(grouped[key].minPrice, flight.ar);
     });
 
     return Object.entries(grouped)
-      .map(([name, data]) => ({
-        name,
-        displayName: groupBy === 'country' ? translateCountry(name) : translateCity(name),
-        flights: data.flights.sort((a, b) => a.ar - b.ar),
-        minPrice: data.minPrice,
-        count: data.flights.length,
-        country: data.country ? translateCountry(data.country) : undefined,
-      }))
-      .sort((a, b) => a.minPrice - b.minPrice);
-  }, [flights, groupBy]);
+      .map(([name, data]) => {
+        const sortedGroupFlights = [...data.flights].sort((a, b) => {
+          switch (sortBy) {
+            case 'price-asc': return a.ar - b.ar;
+            case 'price-desc': return b.ar - a.ar;
+            case 'date-asc': return new Date(a.indulas).getTime() - new Date(b.indulas).getTime();
+            case 'date-desc': return new Date(b.indulas).getTime() - new Date(a.indulas).getTime();
+            case 'days-asc': return a.napok - b.napok;
+            case 'days-desc': return b.napok - a.napok;
+            default: return a.ar - b.ar;
+          }
+        });
+
+        const minPrice = Math.min(...data.flights.map(f => f.ar));
+
+        return {
+          name,
+          displayName: groupBy === 'country' ? translateCountry(name) : translateCity(name),
+          flights: sortedGroupFlights,
+          topFlight: sortedGroupFlights[0],
+          minPrice,
+          count: data.flights.length,
+          country: data.country ? translateCountry(data.country) : undefined,
+        };
+      })
+      .sort((a, b) => {
+        const fA = a.topFlight;
+        const fB = b.topFlight;
+
+        switch (sortBy) {
+          case 'price-asc': return fA.ar - fB.ar;
+          case 'price-desc': return fB.ar - fA.ar;
+          case 'date-asc': return new Date(fA.indulas).getTime() - new Date(fB.indulas).getTime();
+          case 'date-desc': return new Date(fB.indulas).getTime() - new Date(fA.indulas).getTime();
+          case 'days-asc': return fA.napok - fB.napok;
+          case 'days-desc': return fB.napok - fA.napok;
+          default: return fA.ar - fB.ar;
+        }
+      });
+  }, [flights, groupBy, sortBy]);
 
   const toggleGroup = (name: string) => {
     const newExpanded = new Set(expandedGroups);

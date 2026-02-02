@@ -14,10 +14,10 @@ import { FlightFilters } from '@/types/flight';
 const Index = () => {
   const { flights, loading, error } = useFlights();
   const { airportMap, loading: airportsLoading } = useAirports();
-  
+
   // Region is the top-level filter - affects everything
   const [region, setRegion] = useState<Region>('Europe');
-  
+
   // Filter flights by region first (using airport data)
   const regionFilteredFlights = useMemo(() => {
     return flights.filter(flight => {
@@ -29,7 +29,7 @@ const Index = () => {
 
   // Calculate stats based on region-filtered flights
   const stats = useFlightStats(regionFilteredFlights);
-  
+
   const [filters, setFilters] = useState<FlightFilters>({
     searchQuery: '',
     country: '',
@@ -136,7 +136,7 @@ const Index = () => {
   return (
     <div className="min-h-screen pb-12">
       <Header />
-      
+
       <main className="container mx-auto px-4">
         <FilterPanel
           filters={filters}
@@ -155,7 +155,7 @@ const Index = () => {
             region={region}
             setRegion={handleRegionChange}
           />
-          {view === 'list' && (
+          {view !== 'map' && (
             <SortOptions value={sortBy} onChange={setSortBy} />
           )}
         </div>
@@ -163,8 +163,8 @@ const Index = () => {
         {filteredFlights.length === 0 ? (
           <EmptyState />
         ) : view === 'map' ? (
-          <LeafletMap 
-            flights={filteredFlights} 
+          <LeafletMap
+            flights={filteredFlights}
             airportMap={airportMap}
             onSelectCity={handleSelectCity}
             onSelectCountry={handleSelectCountry}
@@ -196,6 +196,7 @@ const Index = () => {
           <GroupedView
             flights={filteredFlights}
             groupBy={view === 'country' ? 'country' : 'city'}
+            sortBy={sortBy}
           />
         )}
       </main>
